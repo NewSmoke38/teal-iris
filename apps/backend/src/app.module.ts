@@ -8,7 +8,7 @@ import { AuthModule } from "./auth/auth.module.js";
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: ".env",
+      envFilePath: "../../.env",
     }),
     DbModule,
     AuthModule,
