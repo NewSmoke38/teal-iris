@@ -10,6 +10,8 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash").notNull(),
   firstName: varchar("first_name", { length: 100 }),
   lastName: varchar("last_name", { length: 100 }),
+  emailVerified: timestamp("email_verified"),
+  verificationToken: varchar("verification_token", { length: 255 }),
   // Language Fields
   nativeLanguage: varchar("native_language", { length: 10 }).notNull(), // e.g., 'en', 'es'
   targetLanguage: varchar("target_language", { length: 10 }).notNull(),

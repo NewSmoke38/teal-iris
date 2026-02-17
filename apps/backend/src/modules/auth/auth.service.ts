@@ -1,10 +1,12 @@
 // apps/backend/src/modules/auth/auth.service.ts
 import {
+  BadRequestException,
   ConflictException,
   Inject,
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
+import { randomBytes } from "crypto";
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcrypt";
 import { eq } from "drizzle-orm";
@@ -52,6 +54,8 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
+    //verification token
+    const verificationToken = randomBytes(32).toString("hex");
 
     const [user] = await this.db
       .insert(users)
@@ -62,6 +66,8 @@ export class AuthService {
         lastName,
         nativeLanguage,
         targetLanguage,
+        verificationToken,
+        emailVerified: null,
       })
       .returning({
         id: users.id,
@@ -73,6 +79,10 @@ export class AuthService {
         createdAt: users.createdAt,
       });
 
+    // //log verification url
+    const verificationUrl = `http://localhost:3000/auth/verify-email?token=${verificationToken}`;
+    console.log("Email verification URL:", verificationUrl);
+
     return user;
   }
 
@@ -83,6 +93,12 @@ export class AuthService {
 
     if (!user) {
       throw new UnauthorizedException("User with this email was not found");
+    }
+    //block if user is not verified
+    if (!user.emailVerified) {
+      throw new UnauthorizedException(
+        "Please verify your email before logging in",
+      );
     }
 
     const isMatch = await bcrypt.compare(pass, user.passwordHash);
@@ -104,5 +120,26 @@ export class AuthService {
         email: user.email,
       },
     };
+  }
+
+  //Email verification
+  async verifyEmail(token: string) {
+    const user = await this.db.query.users.findFirst({
+      where: eq(users.verificationToken, token),
+    });
+
+    if (!user) {
+      throw new BadRequestException("Invalid or expired verification token");
+    }
+
+    await this.db
+      .update(users)
+      .set({
+        emailVerified: new Date(),
+        verificationToken: null,
+      })
+      .where(eq(users.id, user.id));
+
+    return { message: "Email successfully verified" };
   }
 }
