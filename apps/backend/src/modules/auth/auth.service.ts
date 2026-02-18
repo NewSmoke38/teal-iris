@@ -14,7 +14,7 @@ import { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import { DRIZZLE } from "../../db/db.module.js";
 import * as schema from "../../db/schema.js";
-import { users } from "../../db/schema.js";
+import { users, languages } from "../../db/schema.js";
 import { RegisterDto } from "./dto/register.dto.js";
 
 export interface SafeUser {
@@ -22,8 +22,8 @@ export interface SafeUser {
   email: string;
   firstName?: string | null;
   lastName?: string | null;
-  nativeLanguage: string;
-  targetLanguage: string;
+  nativeLanguageId: string;
+  targetLanguageId: string;
   createdAt: Date;
 }
 
@@ -53,6 +53,30 @@ export class AuthService {
       throw new ConflictException("Email already in use");
     }
 
+    if (nativeLanguage === targetLanguage) {
+      throw new BadRequestException(
+        "Native and target language must be different",
+      );
+    }
+
+    const nativeLang = await this.db.query.languages.findFirst({
+      where: eq(languages.code, nativeLanguage),
+    });
+    if (!nativeLang) {
+      throw new BadRequestException(
+        `Invalid native language code: "${nativeLanguage}"`,
+      );
+    }
+
+    const targetLang = await this.db.query.languages.findFirst({
+      where: eq(languages.code, targetLanguage),
+    });
+    if (!targetLang) {
+      throw new BadRequestException(
+        `Invalid target language code: "${targetLanguage}"`,
+      );
+    }
+
     const passwordHash = await bcrypt.hash(password, 12);
     //verification token
     const verificationToken = randomBytes(32).toString("hex");
@@ -65,19 +89,20 @@ export class AuthService {
         passwordHash,
         firstName,
         lastName,
-        nativeLanguage,
-        targetLanguage,
         verificationToken,
         verificationTokenExpiry,
         emailVerified: null,
+        nativeLanguageId: nativeLang.id,
+        targetLanguageId: targetLang.id,
+
       })
       .returning({
         id: users.id,
         email: users.email,
         firstName: users.firstName,
         lastName: users.lastName,
-        nativeLanguage: users.nativeLanguage,
-        targetLanguage: users.targetLanguage,
+        nativeLanguageId: users.nativeLanguageId,
+        targetLanguageId: users.targetLanguageId,
         createdAt: users.createdAt,
       });
 
